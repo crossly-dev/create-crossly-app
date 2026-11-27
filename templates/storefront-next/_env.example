@@ -1,0 +1,7 @@
+# Your Crossly publishable key: Settings → Embeds (or POST /v1/embeds/keys).
+# crossly_pk_… is designed to be public: it reads your active listings and starts a
+# Crossly-hosted checkout, nothing else. Never put a personal access token (crossly_pat_…) here.
+NEXT_PUBLIC_CROSSLY_PK=
+
+# Optional: override the API base (for the sandbox or a local API).
+# NEXT_PUBLIC_CROSSLY_API_BASE=https://crossly.net/api

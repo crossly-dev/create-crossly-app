@@ -1,0 +1,21 @@
+# A personal access token: Crossly → Settings → API & webhooks → Create token.
+# Scopes: sales:read and listings:read; add listings:write to let the price drop change prices.
+CROSSLY_PAT=
+
+# Where sale alerts go: a Slack or Discord incoming-webhook URL (detected from the host).
+# Leave empty to print to the console instead.
+NOTIFY_WEBHOOK_URL=
+
+# How often to look for new sales.
+SALES_INTERVAL_MINUTES=5
+
+# Daily price drop on listings that have not changed for PRICE_DROP_STALE_DAYS.
+PRICE_DROP_ENABLED=true
+PRICE_DROP_PERCENT=10
+PRICE_DROP_STALE_DAYS=14
+# Never below this many dollars (your per-listing floor in Crossly is respected too).
+PRICE_DROP_MIN_PRICE=5
+PRICE_DROP_HOUR_UTC=15
+PRICE_DROP_MAX_PER_RUN=25
+# Plans and reports only until you set this to false.
+PRICE_DROP_DRY_RUN=true

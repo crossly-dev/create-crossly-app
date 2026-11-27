@@ -1,0 +1,5 @@
+# The endpoint signing secret: Settings → API & webhooks → Webhooks → Add endpoint.
+# Shown once when you create the endpoint. 64 hex characters.
+CROSSLY_WEBHOOK_SECRET=
+
+PORT=3000

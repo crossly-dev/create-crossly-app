@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Each template is a real project with its own package.json; keep their dependencies current.
+  # CI scaffolds and tests every template on each PR, so a breaking bump shows up there.
+  - package-ecosystem: npm
+    directories:
+      - /templates/storefront-next
+      - /templates/webhook-express
+      - /templates/webhook-hono-workers
+      - /templates/seller-bot
+      - /templates/oauth-app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      template-dependencies:
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

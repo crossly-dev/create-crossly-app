@@ -1,0 +1,4 @@
+# Local secrets for `wrangler dev`. Copy this file to .dev.vars (never commit it).
+# The endpoint signing secret: Settings → API & webhooks → Webhooks → Add endpoint (shown once).
+# In production: wrangler secret put CROSSLY_WEBHOOK_SECRET
+CROSSLY_WEBHOOK_SECRET=

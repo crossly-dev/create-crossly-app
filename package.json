@@ -1,0 +1,56 @@
+{
+  "name": "create-crossly-app",
+  "version": "0.1.0",
+  "description": "Start a Crossly integration in one command: a Next.js storefront, webhook receivers for Express and Cloudflare Workers, a seller bot, or a Sign in with Crossly OAuth app.",
+  "type": "module",
+  "bin": {
+    "create-crossly-app": "bin/create-crossly-app.mjs"
+  },
+  "exports": {
+    ".": "./src/scaffold.mjs",
+    "./templates": "./src/templates.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check:templates": "node scripts/check-templates.mjs"
+  },
+  "keywords": [
+    "crossly",
+    "create",
+    "scaffold",
+    "starter",
+    "template",
+    "webhooks",
+    "nextjs",
+    "cloudflare-workers",
+    "oauth",
+    "reseller",
+    "crosslisting"
+  ],
+  "author": "Crossly <noreply@crossly.net>",
+  "license": "MIT",
+  "homepage": "https://github.com/crossly-dev/create-crossly-app#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crossly-dev/create-crossly-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/crossly-dev/create-crossly-app/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

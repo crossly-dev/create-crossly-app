@@ -1,0 +1,141 @@
+name: release
+
+# Tag vX.Y.Z (or dispatch) -> test, pack, scaffold every template from the packed
+# tarball, attest it, publish to npm when vars.PUBLISH_NPM == 'true', and cut a
+# GitHub Release on tags.
+#
+# npm auth: secrets.NPM_TOKEN when it is set; otherwise npm trusted publishing
+# (OIDC), which needs create-crossly-app linked to this repository and
+# release.yml on npmjs.com first.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm test
+      - name: version matches the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          have=$(node -p "require('./package.json').version")
+          [ "v$have" = "$GITHUB_REF_NAME" ] || { echo "::error::package.json is $have, tag is $GITHUB_REF_NAME"; exit 1; }
+      - name: pack
+        run: |
+          mkdir -p packed
+          npm pack --pack-destination packed
+          cd packed && sha256sum *.tgz | tee SHA256SUMS.txt
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: packed/*.tgz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: packed/
+          retention-days: 30
+          if-no-files-found: error
+
+  # The tarball being released must scaffold working projects.
+  templates:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [storefront-next, webhook-express, webhook-hono-workers, seller-bot, oauth-app]
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: packed
+      - working-directory: ${{ runner.temp }}
+        run: |
+          tgz=$(ls "$GITHUB_WORKSPACE"/packed/create-crossly-app-*.tgz)
+          npx --yes --package="$tgz" create-crossly-app my-app --template ${{ matrix.template }} --yes
+          cd my-app
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+          npm test
+
+  publish:
+    needs: [build, templates]
+    if: vars.PUBLISH_NPM == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships npm 10.
+      - run: npm install -g npm@^11.5.1
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: packed
+      - name: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          tgz=$(ls packed/create-crossly-app-*.tgz)
+          version=$(tar -xzOf "$tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          if npm view "create-crossly-app@$version" version >/dev/null 2>&1; then
+            echo "create-crossly-app@$version is already on npm; skipping"
+          else
+            npm publish "$tgz" --provenance --access public
+          fi
+
+  github-release:
+    needs: [build, templates, publish]
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success' && needs.templates.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: packed
+      - run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > notes.md
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" packed/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" packed/* --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+          fi

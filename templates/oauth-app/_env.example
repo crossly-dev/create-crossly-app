@@ -1,0 +1,15 @@
+# Register an app: Crossly → Settings → API & webhooks → OAuth apps.
+# Add this redirect URI to it exactly: http://localhost:3000/callback
+CROSSLY_CLIENT_ID=
+# A confidential (server-side) app has a secret, shown once. Leave empty for a public app (PKCE only).
+CROSSLY_CLIENT_SECRET=
+CROSSLY_REDIRECT_URI=http://localhost:3000/callback
+
+# What to ask the seller for. openid is always added. offline_access = a refresh token.
+# Every scope, and which ones an app may ask for: https://crossly.net/docs/api-scopes
+CROSSLY_SCOPES=offline_access listings:read
+
+# Defaults; change only for the sandbox or a local stack.
+# CROSSLY_ISSUER=https://crossly.net/atlas
+# CROSSLY_RESOURCE=https://crossly.net/api/v1
+# CROSSLY_API_BASE=https://crossly.net/api

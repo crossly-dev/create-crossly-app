@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so a template that breaks against a new release of Next, wrangler,
+    # Express or the Crossly SDK is caught before a user scaffolds it.
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  cli:
+    name: cli tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      # Zero dependencies: nothing to install.
+      - run: npm test
+      - name: pack
+        if: matrix.node == '22'
+        run: |
+          mkdir -p packed
+          npm pack --pack-destination packed
+          tar -tzf packed/*.tgz | sort > packed/contents.txt
+          cat packed/contents.txt
+          # npm must ship each template's renamed manifest, ignore and env files.
+          for t in templates/*/; do
+            t=$(basename "$t")
+            for f in package.json _gitignore _env.example README.md; do
+              grep -qx "package/templates/$t/$f" packed/contents.txt || { echo "::error::tarball is missing templates/$t/$f"; exit 1; }
+            done
+          done
+      - uses: actions/upload-artifact@v7
+        if: matrix.node == '22'
+        with:
+          name: cli-tarball
+          path: packed/*.tgz
+          retention-days: 7
+          if-no-files-found: error
+
+  # Scaffold EVERY template from the packed tarball, non-interactively, exactly as
+  # `npx create-crossly-app` would, then install, typecheck, build and test it.
+  template:
+    name: ${{ matrix.template }} (${{ matrix.pm }})
+    needs: cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [storefront-next, webhook-express, webhook-hono-workers, seller-bot, oauth-app]
+        pm: [npm]
+        include:
+          - template: webhook-express
+            pm: pnpm
+          - template: seller-bot
+            pm: pnpm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - if: matrix.pm == 'pnpm'
+        run: npm install -g pnpm@10
+      - uses: actions/download-artifact@v8
+        with:
+          name: cli-tarball
+          path: packed
+      - name: scaffold with npx (non-interactive)
+        working-directory: ${{ runner.temp }}
+        run: |
+          tgz=$(ls "$GITHUB_WORKSPACE"/packed/create-crossly-app-*.tgz)
+          npx --yes --package="$tgz" create-crossly-app my-app --template ${{ matrix.template }} --pm ${{ matrix.pm }} --yes
+          test -f my-app/package.json
+          test -f my-app/.env.example
+          test -f my-app/.gitignore
+          if grep -rnE '__[A-Z_]+__' my-app; then echo "::error::unfilled placeholders"; exit 1; fi
+      - name: install
+        working-directory: ${{ runner.temp }}/my-app
+        run: ${{ matrix.pm }} install
+      - name: typecheck
+        working-directory: ${{ runner.temp }}/my-app
+        run: ${{ matrix.pm }} run typecheck
+      - name: build
+        working-directory: ${{ runner.temp }}/my-app
+        run: ${{ matrix.pm }} run build
+      - name: test
+        working-directory: ${{ runner.temp }}/my-app
+        run: ${{ matrix.pm }} run test
+
+  # One run through the real binary with --install, to cover the install path end to end.
+  install-flag:
+    needs: cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v8
+        with:
+          name: cli-tarball
+          path: packed
+      - working-directory: ${{ runner.temp }}
+        run: |
+          tgz=$(ls "$GITHUB_WORKSPACE"/packed/create-crossly-app-*.tgz)
+          npx --yes --package="$tgz" create-crossly-app auth-app -t oauth-app --pm npm --yes --install
+          test -d auth-app/node_modules/tsx
+          cd auth-app && npm test

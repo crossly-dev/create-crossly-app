@@ -1,0 +1,10 @@
+{
+  // https://developers.cloudflare.com/workers/wrangler/configuration/
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "__WORKER_NAME__",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true }
+  // Secrets are not configured here. Set them with:
+  //   wrangler secret put CROSSLY_WEBHOOK_SECRET
+}
