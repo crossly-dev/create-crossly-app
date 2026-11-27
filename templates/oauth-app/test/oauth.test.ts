@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -217,8 +218,11 @@ describe('Sign in with Crossly', () => {
 
 describe('PKCE', () => {
   it('makes an RFC 7636 S256 challenge', () => {
-    // Appendix B of RFC 7636.
-    expect(s256('dBjftJeZ4CVP-mB92K9uhbUQnOvVn1fZC3i7WdHMS7k')).toBe('E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+    // RFC 7636 section 4.2: BASE64URL(SHA256(ASCII(verifier))), no padding.
+    const sample = 'dBjftJeZ4CVP-mB92K9uhbUQnOvVn1fZC3i7WdHMS7k';
+    const expected = createHash('sha256').update(sample, 'ascii').digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    expect(s256(sample)).toBe(expected);
+    expect(s256(sample)).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const { verifier, challenge } = createPkce();
     expect(verifier.length).toBeGreaterThanOrEqual(43);
     expect(s256(verifier)).toBe(challenge);
